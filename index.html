@@ -131,8 +131,8 @@
 
 <div id="toast"></div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-database-compat.js"></script>
 
 <script>
 const FIREBASE_CONFIG = {
@@ -240,15 +240,15 @@ function openChat(username) {
 
 function renderMessages() {
   const container = document.getElementById('messages');
-  if (!container) return;
+  if (!container) { console.log('NO MESSAGES DIV'); return; }
   const cid = chatId(myUsername.toLowerCase(), activeChat.toLowerCase());
   const msgs = messages[cid] || [];
-  console.log('renderMessages cid:', cid, 'msgs:', msgs.length, 'all keys:', Object.keys(messages));
+  console.log('renderMessages cid:', cid, 'msgs:', msgs.length, 'container:', container, 'first msg:', msgs[0]);
   if (!msgs.length) {
     container.innerHTML = `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-family:var(--font-mono);font-size:0.8rem;margin:auto;">Say hello ✶</div>`;
     return;
   }
-  container.innerHTML = msgs.map(m => {
+  const html = msgs.map(m => {
     const isMe = m.from === myUsername;
     return `<div class="msg ${isMe?'me':'them'}">
       ${!isMe?`<div class="msg-sender">${m.from}</div>`:''}
@@ -256,6 +256,8 @@ function renderMessages() {
       <div class="msg-time">${fmtTime(m.time)}</div>
     </div>`;
   }).join('');
+  console.log('Setting innerHTML, length:', html.length, 'isMe check:', msgs[0] && msgs[0].from, 'myUsername:', myUsername);
+  container.innerHTML = html;
   container.scrollTop = container.scrollHeight;
 }
 
