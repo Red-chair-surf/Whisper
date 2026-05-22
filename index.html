@@ -277,14 +277,13 @@ function sendMessage() {
 
 function registerPresence() {
   const userRef = db.ref('online/' + myUsername);
-  const userData = { username: myUsername.toLowerCase(), color: colorForUser(myUsername), lastSeen: Date.now() };
+  const userData = { username: myUsername, color: colorForUser(myUsername), lastSeen: Date.now() };
   userRef.set(userData);
   userRef.onDisconnect().remove();
 
   db.ref('online').on('value', snap => {
-    const prev = Object.keys(onlineUsers);
     onlineUsers = {};
-    snap.forEach(child => { onlineUsers[child.key] = child.val(); });
+    snap.forEach(child => { onlineUsers[child.val().username] = child.val(); });
     console.log('Online users:', Object.keys(onlineUsers));
     Object.keys(onlineUsers).forEach(u => {
       if (u !== myUsername) subscribeToChat(u);
