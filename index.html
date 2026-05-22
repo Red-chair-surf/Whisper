@@ -211,6 +211,7 @@ function subscribeToChat(username) {
 }
 
 function openChat(username) {
+  console.log('openChat called for:', username);
   activeChat = username;
   unread[username] = 0;
   subscribeToChat(username);
