@@ -198,20 +198,13 @@ function subscribeToChat(username) {
     snap.forEach(child => newMsgs.push(child.val()));
     messages[cid] = newMsgs;
     console.log('Messages update for', cid, newMsgs.length, 'activeChat:', activeChat);
-    if (activeChat === username) {
-      const container = document.getElementById('messages');
-      if (container) {
-        renderMessages();
-      } else {
-        // Chat window closed — reopen it
-        openChat(username);
-      }
-    } else {
-      if (newMsgs.length > prevCount) {
-        unread[username] = (unread[username]||0)+1;
-        renderUserList();
-        showToast('New message from ' + username);
-      }
+    const container = document.getElementById('messages');
+    if (activeChat === username && container) {
+      renderMessages();
+    } else if (newMsgs.length > prevCount) {
+      unread[username] = (unread[username]||0)+1;
+      renderUserList();
+      showToast('New message from ' + username);
     }
     prevCount = newMsgs.length;
   });
