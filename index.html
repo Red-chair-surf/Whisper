@@ -85,6 +85,17 @@
   #msg-input::placeholder { color: var(--text-muted); }
   #send-btn { background: var(--accent); border: none; border-radius: 10px; width: 42px; height: 42px; flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: opacity 0.15s; }
   #send-btn:hover { opacity: 0.85; }
+  @media (max-width: 600px) {
+    #sidebar { width: 100%; min-width: 0; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 10; }
+    #sidebar.hidden { display: none; }
+    #chat-area { width: 100%; }
+    .back-btn { display: flex !important; }
+    #landing { padding: 1.5rem; }
+    .logo { font-size: 2rem; }
+    .landing-card { padding: 1.5rem; }
+  }
+  .back-btn { display: none; align-items: center; gap: 0.5rem; background: none; border: none; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.75rem; cursor: pointer; padding: 0; }
+  .back-btn:hover { color: var(--text); }
   ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
   #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--surface); border: 1px solid var(--border-bright); border-radius: 10px; padding: 0.75rem 1rem; font-size: 0.8rem; font-family: var(--font-mono); color: var(--text-mid); opacity: 0; transform: translateY(8px); transition: all 0.2s; pointer-events: none; z-index: 100; max-width: 240px; }
   #toast.show { opacity: 1; transform: translateY(0); }
@@ -206,6 +217,7 @@ function startChat(username) {
   const color = userColor(username);
   document.getElementById('chat-area').innerHTML = `
     <div id="chat-header">
+      <button class="back-btn" onclick="showSidebar()">&#8592; back</button>
       <div class="ch-avatar" style="color:${color}">${username.slice(0,2).toUpperCase()}</div>
       <div><div id="chat-name">${username}</div><div id="chat-status">● online</div></div>
     </div>
@@ -220,6 +232,7 @@ function startChat(username) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
   });
   document.getElementById('msg-input').focus();
+  hideSidebar();
   // Load and live-listen to messages
   const key = cid(ME, username);
   // Cancel any previous active listener
@@ -271,6 +284,19 @@ function drawMessages(snap) {
   });
   el.innerHTML = html;
   el.scrollTop = el.scrollHeight;
+}
+
+// ---- MOBILE NAV ----
+function showSidebar() {
+  document.getElementById('sidebar').classList.remove('hidden');
+  CHAT_WITH = null;
+  if (window._activeMsgRef) window._activeMsgRef.off();
+  document.getElementById('chat-area').innerHTML = '<div id="chat-empty"><div class="empty-icon">💬</div><p>Select someone to message</p></div>';
+}
+function hideSidebar() {
+  if (window.innerWidth <= 600) {
+    document.getElementById('sidebar').classList.add('hidden');
+  }
 }
 
 // ---- SEND ----
