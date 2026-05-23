@@ -215,7 +215,7 @@ function startChat(username) {
   // Re-render sidebar to show active
   db.ref('online').once('value', snap => {
     const users = [];
-    snap.forEach(c => { if (c.val().username !== ME) users.push(c.val()); });
+    snap.forEach(c => { if (c.key !== ME) users.push(c.val()); });
     renderSidebar(users);
   });
   // Build chat UI
