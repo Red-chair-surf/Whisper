@@ -176,7 +176,7 @@ function goOnline() {
   ref.onDisconnect().remove();
   db.ref('online').on('value', snap => {
     const users = [];
-    snap.forEach(c => { if (c.val().username !== ME) users.push(c.val()); });
+    snap.forEach(c => { if (c.key !== ME) users.push(c.val()); });
     renderSidebar(users);
     users.forEach(u => listenForMessages(u.username));
   });
