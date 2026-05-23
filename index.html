@@ -201,7 +201,10 @@ function listenForMessages(username) {
   if (listening[key]) return;
   listening[key] = true;
   db.ref('messages/' + key).on('value', snap => {
-    if (CHAT_WITH === username) drawMessages(snap);
+    console.log('message update for', key, 'CHAT_WITH:', CHAT_WITH, 'username:', username);
+    if (CHAT_WITH === username) {
+      drawMessages(snap);
+    }
   });
 }
 
