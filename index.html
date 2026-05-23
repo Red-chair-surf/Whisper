@@ -134,9 +134,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-app-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-database-compat.js"></script>
-
 <script>
-const FIREBASE_CONFIG = {
+firebase.initializeApp({
   apiKey: "AIzaSyA8_MOrfA1ypmGDAzyJVfn-w7yicxTtbZg",
   authDomain: "whisper-f5b04.firebaseapp.com",
   databaseURL: "https://whisper-f5b04-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -144,168 +143,131 @@ const FIREBASE_CONFIG = {
   storageBucket: "whisper-f5b04.firebasestorage.app",
   messagingSenderId: "149872581823",
   appId: "1:149872581823:web:81835e3daa8ecea9c8fa0a"
-};
+});
+const db = firebase.database();
 
-let db = null;
-try {
-  firebase.initializeApp(FIREBASE_CONFIG);
-  db = firebase.database();
-} catch(e) { console.error('Firebase init failed', e); }
-
-let myUsername = '';
-let activeChat = null;
-let messages = {};
-let onlineUsers = {};
-let unread = {};
-let chatListeners = {};
+// State
+let ME = '';
+let CHAT_WITH = null;
+let msgListener = null;
 
 const COLORS = ['#b8ff57','#57ffa8','#57c8ff','#ff8c57','#c857ff','#ff57b8','#ffdb57'];
-function colorForUser(name) { let h=0; for(let c of name) h=(h*31+c.charCodeAt(0))%COLORS.length; return COLORS[h]; }
-function initials(name) { return name.slice(0,2).toUpperCase(); }
-function chatId(a,b) { return [a.toLowerCase(),b.toLowerCase()].sort().join('__'); }
-function fmtTime(ts) { return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
-function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+function userColor(n) { let h=0; for(let c of n) h=(h*31+c.charCodeAt(0))%COLORS.length; return COLORS[h]; }
+function cid(a,b) { return [a,b].sort().join('~~'); }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3200);
-}
-
-function renderUserList() {
-  const list = document.getElementById('users-list');
-  const others = Object.values(onlineUsers).filter(u => u.username !== myUsername);
-  if (!others.length) { list.innerHTML = '<div class="no-users">Waiting for others…</div>'; return; }
-  list.innerHTML = others.map(u => {
-    const isActive = activeChat === u.username;
-    const uc = unread[u.username] || 0;
-    return `<div class="user-item${isActive?' active':''}" onclick="openChat('${u.username}')">
-      <div class="avatar" style="color:${u.color}">${initials(u.username)}</div>
-      <div class="user-info"><div class="user-name">${u.username}</div><div class="user-status">online</div></div>
-      <div class="online-dot"></div>
-      ${uc ? `<div class="unread-badge">${uc}</div>` : ''}
-    </div>`;
-  }).join('');
-}
-
-function subscribeToChat(username) {
-  if (chatListeners[username]) return;
-  chatListeners[username] = true;
-  const cid = chatId(myUsername.toLowerCase(), username.toLowerCase());
-  console.log('Subscribing to chat:', cid);
-  let prevCount = 0;
-  db.ref('messages/' + cid).on('value', snap => {
-    const newMsgs = [];
-    snap.forEach(child => newMsgs.push(child.val()));
-    messages[cid] = newMsgs;
-    console.log('Messages update for', cid, newMsgs.length, 'activeChat:', activeChat);
-    const container = document.getElementById('messages');
-    if (activeChat === username && container) {
-      renderMessages();
-    } else if (newMsgs.length > prevCount) {
-      unread[username] = (unread[username]||0)+1;
-      renderUserList();
-      showToast('New message from ' + username);
-    }
-    prevCount = newMsgs.length;
-  });
-}
-
-function openChat(username) {
-  console.log('openChat called for:', username);
-  activeChat = username;
-  unread[username] = 0;
-  subscribeToChat(username);
-  renderUserList();
-  const chatArea = document.getElementById('chat-area');
-  const user = onlineUsers[username] || { username, color: colorForUser(username) };
-  chatArea.innerHTML = `
-    <div id="chat-header">
-      <div class="ch-avatar" style="color:${user.color}">${initials(username)}</div>
-      <div><div id="chat-name">${username}</div><div id="chat-status">&#9679; online</div></div>
-    </div>
-    <div id="messages"></div>
-    <div id="input-area">
-      <textarea id="msg-input" placeholder="Message ${username}&hellip;" rows="1"></textarea>
-      <button id="send-btn" onclick="sendMessage()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d0d0f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-      </button>
-    </div>`;
-  const ta = document.getElementById('msg-input');
-  ta.addEventListener('keydown', e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
-  ta.addEventListener('input', () => { ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight,120)+'px'; });
-  ta.focus();
-  renderMessages();
-}
-
-function renderMessages() {
-  const container = document.getElementById('messages');
-  if (!container) { console.log('NO MESSAGES DIV'); return; }
-  const cid = chatId(myUsername.toLowerCase(), activeChat.toLowerCase());
-  const msgs = messages[cid] || [];
-  console.log('renderMessages cid:', cid, 'msgs:', msgs.length, 'container:', container, 'first msg:', msgs[0]);
-  if (!msgs.length) {
-    container.innerHTML = `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-family:var(--font-mono);font-size:0.8rem;margin:auto;">Say hello ✶</div>`;
-    return;
-  }
-  const html = msgs.map(m => {
-    const isMe = m.from === myUsername;
-    return `<div class="msg ${isMe?'me':'them'}">
-      ${!isMe?`<div class="msg-sender">${m.from}</div>`:''}
-      <div class="bubble">${escapeHtml(m.text)}</div>
-      <div class="msg-time">${fmtTime(m.time)}</div>
-    </div>`;
-  }).join('');
-  console.log('Setting innerHTML, length:', html.length, 'isMe check:', msgs[0] && msgs[0].from, 'myUsername:', myUsername);
-  container.innerHTML = html;
-  container.scrollTop = container.scrollHeight;
-}
-
-function sendMessage() {
-  const input = document.getElementById('msg-input');
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text || !activeChat) return;
-  input.value = ''; input.style.height = '42px';
-  const msg = { from: myUsername, to: activeChat, text, time: Date.now() };
-  const cid = chatId(myUsername.toLowerCase(), activeChat.toLowerCase());
-  db.ref('messages/' + cid).push(msg)
-    .then(() => console.log('Message sent OK'))
-    .catch(e => console.error('Send failed:', e));
-}
-
-function registerPresence() {
-  const userRef = db.ref('online/' + myUsername);
-  const userData = { username: myUsername, color: colorForUser(myUsername), lastSeen: Date.now() };
-  userRef.set(userData);
-  userRef.onDisconnect().remove();
-
-  db.ref('online').on('value', snap => {
-    onlineUsers = {};
-    snap.forEach(child => { onlineUsers[child.val().username] = child.val(); });
-    console.log('Online users:', Object.keys(onlineUsers));
-    Object.keys(onlineUsers).forEach(u => {
-      if (u !== myUsername) subscribeToChat(u);
-    });
-    renderUserList();
-  });
-}
-
-const usernameInput = document.getElementById('username-input');
-const joinBtn = document.getElementById('join-btn');
-usernameInput.addEventListener('input', () => { joinBtn.disabled = usernameInput.value.trim().length < 2; });
-usernameInput.addEventListener('keydown', e => { if(e.key==='Enter'&&!joinBtn.disabled) joinBtn.click(); });
-joinBtn.addEventListener('click', () => {
-  const name = usernameInput.value.trim().replace(/\s+/g,'_').toLowerCase();
+// ---- JOIN ----
+document.getElementById('username-input').addEventListener('input', function() {
+  document.getElementById('join-btn').disabled = this.value.trim().length < 2;
+});
+document.getElementById('join-btn').addEventListener('click', function() {
+  const name = document.getElementById('username-input').value.trim().toLowerCase().replace(/\s+/g,'_');
   if (name.length < 2) return;
-  myUsername = name;
+  ME = name;
   document.getElementById('landing').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-  document.getElementById('my-name-display').textContent = '@' + myUsername;
-  registerPresence();
+  document.getElementById('my-name-display').textContent = '@' + ME;
+  goOnline();
 });
+
+// ---- PRESENCE ----
+function goOnline() {
+  const ref = db.ref('online/' + ME);
+  ref.set({ username: ME, color: userColor(ME) });
+  ref.onDisconnect().remove();
+  db.ref('online').on('value', snap => {
+    const users = [];
+    snap.forEach(c => { if (c.val().username !== ME) users.push(c.val()); });
+    renderSidebar(users);
+    users.forEach(u => listenForMessages(u.username));
+  });
+}
+
+// ---- SIDEBAR ----
+function renderSidebar(users) {
+  const el = document.getElementById('users-list');
+  if (!users.length) { el.innerHTML = '<div class="no-users">Waiting for others…</div>'; return; }
+  el.innerHTML = users.map(u => `
+    <div class="user-item${CHAT_WITH===u.username?' active':''}" onclick="startChat('${u.username}')">
+      <div class="avatar" style="color:${u.color}">${u.username.slice(0,2).toUpperCase()}</div>
+      <div class="user-info"><div class="user-name">${u.username}</div><div class="user-status">online</div></div>
+      <div class="online-dot"></div>
+    </div>`).join('');
+}
+
+// ---- LISTEN FOR INCOMING MESSAGES (even before chat is open) ----
+const listening = {};
+function listenForMessages(username) {
+  const key = cid(ME, username);
+  if (listening[key]) return;
+  listening[key] = true;
+  db.ref('messages/' + key).on('value', snap => {
+    if (CHAT_WITH === username) drawMessages(snap);
+  });
+}
+
+// ---- OPEN CHAT ----
+function startChat(username) {
+  CHAT_WITH = username;
+  // Re-render sidebar to show active
+  db.ref('online').once('value', snap => {
+    const users = [];
+    snap.forEach(c => { if (c.val().username !== ME) users.push(c.val()); });
+    renderSidebar(users);
+  });
+  // Build chat UI
+  const color = userColor(username);
+  document.getElementById('chat-area').innerHTML = `
+    <div id="chat-header">
+      <div class="ch-avatar" style="color:${color}">${username.slice(0,2).toUpperCase()}</div>
+      <div><div id="chat-name">${username}</div><div id="chat-status">● online</div></div>
+    </div>
+    <div id="messages" style="flex:1;overflow-y:auto;padding:1.25rem;display:block;"></div>
+    <div id="input-area">
+      <textarea id="msg-input" placeholder="Message ${username}…" rows="1" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:0.7rem 1rem;color:var(--text);font-family:var(--font-head);font-size:0.9rem;outline:none;resize:none;min-height:42px;max-height:120px;line-height:1.5;"></textarea>
+      <button id="send-btn" onclick="sendMsg()" style="background:var(--accent);border:none;border-radius:10px;width:42px;height:42px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d0d0f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
+    </div>`;
+  document.getElementById('msg-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+  });
+  document.getElementById('msg-input').focus();
+  // Load existing messages
+  const key = cid(ME, username);
+  db.ref('messages/' + key).once('value', snap => drawMessages(snap));
+}
+
+// ---- DRAW MESSAGES ----
+function drawMessages(snap) {
+  const el = document.getElementById('messages');
+  if (!el) return;
+  const msgs = [];
+  snap.forEach(c => msgs.push(c.val()));
+  if (!msgs.length) { el.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:0.8rem;margin-top:2rem;">Say hello</p>'; return; }
+  el.innerHTML = msgs.map(m => {
+    const me = m.from === ME;
+    const time = new Date(m.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    return `<div style="display:flex;flex-direction:column;max-width:72%;margin-bottom:0.75rem;${me?'align-self:flex-end;align-items:flex-end;margin-left:auto;':'align-self:flex-start;align-items:flex-start;'}">
+      ${!me ? `<div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px;">${m.from}</div>` : ''}
+      <div style="padding:0.6rem 0.9rem;border-radius:14px;font-size:0.9rem;line-height:1.5;word-break:break-word;${me?'background:var(--me-bubble);border:1px solid rgba(184,255,87,0.18);border-bottom-right-radius:4px;color:#d8f0a8;':'background:var(--them-bubble);border:1px solid var(--border);border-bottom-left-radius:4px;'}">${m.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/
+/g,'<br>')}</div>
+      <div style="font-size:0.65rem;color:var(--text-muted);margin-top:3px;">${time}</div>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ---- SEND ----
+function sendMsg() {
+  const input = document.getElementById('msg-input');
+  if (!input || !CHAT_WITH) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.style.height = '42px';
+  const key = cid(ME, CHAT_WITH);
+  db.ref('messages/' + key).push({ from: ME, to: CHAT_WITH, text, time: Date.now() });
+}
 </script>
 </body>
 </html>
