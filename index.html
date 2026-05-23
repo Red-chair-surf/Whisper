@@ -178,7 +178,6 @@ function goOnline() {
     const users = [];
     snap.forEach(c => { if (c.key !== ME) users.push(c.val()); });
     renderSidebar(users);
-    users.forEach(u => listenForMessages(u.username));
   });
 }
 
@@ -192,20 +191,6 @@ function renderSidebar(users) {
       <div class="user-info"><div class="user-name">${u.username}</div><div class="user-status">online</div></div>
       <div class="online-dot"></div>
     </div>`).join('');
-}
-
-// ---- LISTEN FOR INCOMING MESSAGES (even before chat is open) ----
-const listening = {};
-function listenForMessages(username) {
-  const key = cid(ME, username);
-  if (listening[key]) return;
-  listening[key] = true;
-  db.ref('messages/' + key).on('value', snap => {
-    if (snap.numChildren() === 0) return;
-    if (CHAT_WITH === null) {
-      startChat(username);
-    }
-  });
 }
 
 // ---- OPEN CHAT ----
