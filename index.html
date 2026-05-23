@@ -201,9 +201,10 @@ function listenForMessages(username) {
   if (listening[key]) return;
   listening[key] = true;
   db.ref('messages/' + key).on('value', snap => {
-    console.log('message update for', key, 'CHAT_WITH:', CHAT_WITH, 'username:', username);
-    if (CHAT_WITH === username) {
-      drawMessages(snap);
+    if (snap.numChildren() === 0) return;
+    if (CHAT_WITH !== username) {
+      // Show notification - message arrived but chat not open
+      startChat(username);
     }
   });
 }
@@ -235,9 +236,13 @@ function startChat(username) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
   });
   document.getElementById('msg-input').focus();
-  // Load existing messages
+  // Load and live-listen to messages
   const key = cid(ME, username);
-  db.ref('messages/' + key).once('value', snap => drawMessages(snap));
+  // Cancel any previous active listener
+  if (window._activeMsgRef) window._activeMsgRef.off('value', window._activeMsgHandler);
+  window._activeMsgHandler = snap => drawMessages(snap);
+  window._activeMsgRef = db.ref('messages/' + key);
+  window._activeMsgRef.on('value', window._activeMsgHandler);
 }
 
 // ---- DRAW MESSAGES ----
