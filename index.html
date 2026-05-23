@@ -202,8 +202,7 @@ function listenForMessages(username) {
   listening[key] = true;
   db.ref('messages/' + key).on('value', snap => {
     if (snap.numChildren() === 0) return;
-    if (CHAT_WITH !== username) {
-      // Show notification - message arrived but chat not open
+    if (CHAT_WITH === null) {
       startChat(username);
     }
   });
